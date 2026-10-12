@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Nautilus.Assets;
 using Nautilus.Patchers;
 using Nautilus.Utility;
@@ -54,7 +55,14 @@ public static class PrefabHandler
                 yield break;
             }
         
-            yield return prefabFactory(gameObject);
+            var factoryFailure = new StrongBox<Exception>();
+            yield return RunSafely(prefabFactory(gameObject), factoryFailure);
+            if (factoryFailure.Value != null)
+            {
+                InternalLogger.Error($"PrefabHandler: PrefabFactory for {info.ClassID} threw an exception: {factoryFailure.Value}");
+                gameObject.Set(null);
+                yield break;
+            }
 
             var obj = gameObject.Get();
             if(obj == null)
@@ -97,7 +105,16 @@ public static class PrefabHandler
             }
 
             if (Prefabs.TryGetPostProcessorForInfo(info, out var postProcessor))
-                yield return postProcessor?.Invoke(obj);
+            {
+                var postProcessorFailure = new StrongBox<Exception>();
+                yield return RunSafely(postProcessor?.Invoke(obj), postProcessorFailure);
+                if (postProcessorFailure.Value != null)
+                {
+                    InternalLogger.Error($"PrefabHandler: Post processor for {info.ClassID} threw an exception: {postProcessorFailure.Value}");
+                    gameObject.Set(null);
+                    yield break;
+                }
+            }
 
             gameObject.Set(obj);
             ModPrefabCache.AddPrefab(obj);
@@ -105,6 +122,44 @@ public static class PrefabHandler
         finally
         {
             ModPrefabCache.RunningPrefabs.Remove(info.ClassID);
+        }
+    }
+
+    private static IEnumerator RunSafely(IEnumerator routine, StrongBox<Exception> failure)
+    {
+        if (routine == null)
+        {
+            yield break;
+        }
+
+        var stack = new Stack<IEnumerator>();
+        stack.Push(routine);
+        while (stack.Count > 0)
+        {
+            object current;
+            try
+            {
+                if (!stack.Peek().MoveNext())
+                {
+                    stack.Pop();
+                    continue;
+                }
+
+                current = stack.Peek().Current;
+            }
+            catch (Exception e)
+            {
+                failure.Value = e;
+                yield break;
+            }
+
+            if (current is IEnumerator nested)
+            {
+                stack.Push(nested);
+                continue;
+            }
+
+            yield return current;
         }
     }
 }
