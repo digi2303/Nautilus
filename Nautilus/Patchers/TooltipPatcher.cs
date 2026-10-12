@@ -122,9 +122,10 @@ internal class TooltipPatcher
             { "Nothing", ExtraItemInfo.Nothing },
         };
 
-        if(!stringToEnum.TryGetValue(configValue, out ExtraItemInfo extraItemInfo))
+        if(configValue is null || !stringToEnum.TryGetValue(configValue, out ExtraItemInfo extraItemInfo))
         {
-            throw new System.NotImplementedException("tooltip patcher value unrecognized. This error should never happen but should still have proper handling");
+            InternalLogger.Warn($"Unrecognized extraItemInfo config value '{configValue ?? "null"}', falling back to \"Mod name (default)\".");
+            extraItemInfo = ExtraItemInfo.ModName;
         }
 
         ExtraItemInfoOption = extraItemInfo;
