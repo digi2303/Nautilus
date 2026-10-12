@@ -70,7 +70,7 @@ public sealed class EnumBuilder<TEnum> where TEnum : Enum
             return builder;
         }
 
-        InternalLogger.Announce($"{name} already exists in {nameof(TEnum)}!", LogLevel.Error, true);
+        InternalLogger.Announce($"{name} already exists in {typeof(TEnum).Name}!", LogLevel.Error, true);
         return null;
     }
 
