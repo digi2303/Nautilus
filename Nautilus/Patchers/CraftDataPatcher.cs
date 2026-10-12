@@ -73,7 +73,8 @@ internal class CraftDataPatcher
         for (int i = 0; i < updated.Count; i++)
         {
             TechType updatedTechData = updated[i];
-            CustomRecipeData[updatedTechData] = TechData.entries[updatedTechData];
+            CustomRecipeData.Remove(updatedTechData);
+            CustomRecipeData.Add(updatedTechData, TechData.entries[updatedTechData]);
         }
 
         if (added.Count > 0)
