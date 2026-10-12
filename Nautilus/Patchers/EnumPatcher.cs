@@ -66,6 +66,11 @@ internal static class EnumPatcher
 
     private static bool IsDefined(IEnumCache cacheManager, object value)
     {
+        if (value is string name)
+        {
+            return cacheManager.TryParse(name, out object parsed) && cacheManager.TryGetValue(parsed, out string exactName) && exactName == name;
+        }
+
         return cacheManager.ContainsKey(value);
     }
 
