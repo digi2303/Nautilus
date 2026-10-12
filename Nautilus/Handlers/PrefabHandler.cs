@@ -36,7 +36,7 @@ public static class PrefabHandler
 
     private static IEnumerator InitPrefabAsync(TaskResult<GameObject> gameObject, PrefabInfo info, PrefabFactoryAsync prefabFactory)
     {
-        if (!ModPrefabCache.RunningPrefabs.Add(info.ClassID))
+        while (!ModPrefabCache.RunningPrefabs.Add(info.ClassID))
         {
             yield return new WaitUntil(() => ModPrefabCache.RunningPrefabs.Contains(info.ClassID) is false);
             if (ModPrefabCache.TryGetPrefabFromCache(info.ClassID, out var prefabInCache))
@@ -46,60 +46,66 @@ public static class PrefabHandler
             }
         }
         
-        if (prefabFactory == null)
+        try
         {
-            InternalLogger.Error($"PrefabHandler: Prefab Factory for {info.ClassID} is null!");
-            yield break;
-        }
-        
-        yield return prefabFactory(gameObject);
-
-        var obj = gameObject.Get();
-        if(obj == null)
-        {
-            InternalLogger.Error($"PrefabHandler: PrefabFactory returned null for {info.ClassID}");
-            yield break;
-        }
-
-        var techType = info.TechType;
-        var classId = info.ClassID;
-
-        obj.name = classId;
-
-        var constructable = obj.GetComponent<Constructable>();
-        
-        if (techType != TechType.None)
-        {
-
-            if (obj.GetComponent<TechTag>() is { } tag)
+            if (prefabFactory == null)
             {
-                tag.type = techType;
+                InternalLogger.Error($"PrefabHandler: Prefab Factory for {info.ClassID} is null!");
+                yield break;
             }
+        
+            yield return prefabFactory(gameObject);
+
+            var obj = gameObject.Get();
+            if(obj == null)
+            {
+                InternalLogger.Error($"PrefabHandler: PrefabFactory returned null for {info.ClassID}");
+                yield break;
+            }
+
+            var techType = info.TechType;
+            var classId = info.ClassID;
+
+            obj.name = classId;
+
+            var constructable = obj.GetComponent<Constructable>();
+        
+            if (techType != TechType.None)
+            {
+
+                if (obj.GetComponent<TechTag>() is { } tag)
+                {
+                    tag.type = techType;
+                }
             
-            if (constructable)
-            {
-                constructable.techType = techType;
+                if (constructable)
+                {
+                    constructable.techType = techType;
+                }
             }
-        }
 
 #if SUBNAUTICA
-        if (constructable && !constructable.ghostMaterial)
-        {
-            constructable.ghostMaterial = MaterialUtils.GhostMaterial;
-        }
+            if (constructable && !constructable.ghostMaterial)
+            {
+                constructable.ghostMaterial = MaterialUtils.GhostMaterial;
+            }
 #endif
 
-        if (obj.GetComponent<PrefabIdentifier>() is { } pid)
-        {
-            pid.ClassId = classId;
+            if (obj.GetComponent<PrefabIdentifier>() is { } pid)
+            {
+                pid.ClassId = classId;
+            }
+
+            if (Prefabs.TryGetPostProcessorForInfo(info, out var postProcessor))
+                yield return postProcessor?.Invoke(obj);
+
+            gameObject.Set(obj);
+            ModPrefabCache.AddPrefab(obj);
         }
-
-        if (Prefabs.TryGetPostProcessorForInfo(info, out var postProcessor))
-            yield return postProcessor?.Invoke(obj);
-
-        gameObject.Set(obj);
-        ModPrefabCache.AddPrefab(obj);
-        ModPrefabCache.RunningPrefabs.Remove(info.ClassID);
+        finally
+        {
+            ModPrefabCache.RunningPrefabs.Remove(info.ClassID);
+        }
     }
 }
 
